@@ -1,27 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Колесо Фортуны</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎡 Колесо Фортуны</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            padding: 20px;
+            color: white;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
         .wheel-container {
             position: relative;
             width: 300px;
             height: 300px;
-            margin: 20px auto;
+            margin: 0 auto 30px;
         }
         
         .wheel {
@@ -37,55 +56,94 @@
                 #ff9ff3 300deg 360deg
             );
             transition: transform 3s cubic-bezier(0.2, 0.8, 0.3, 1);
-            border: 8px solid #fff;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            border: 10px solid white;
+            box-shadow: 0 0 30px rgba(0,0,0,0.4);
+            position: relative;
         }
         
         .pointer {
             position: absolute;
-            top: -20px;
+            top: -15px;
             left: 50%;
             transform: translateX(-50%);
-            font-size: 40px;
-            color: #fff;
+            font-size: 50px;
+            color: white;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 2;
         }
         
         .spin-btn {
-            background: #fff;
+            background: white;
             color: #667eea;
             border: none;
-            padding: 15px 30px;
-            font-size: 18px;
-            border-radius: 25px;
+            padding: 16px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
             cursor: pointer;
-            margin: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
+            margin: 20px 0;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
         }
         
         .spin-btn:hover {
-            transform: scale(1.05);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        
+        .spin-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .result {
-            margin-top: 20px;
+            margin-top: 25px;
             font-size: 24px;
+            font-weight: bold;
+            min-height: 36px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .segment-label {
+            position: absolute;
             color: white;
             font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            font-size: 24px;
+            pointer-events: none;
+        }
+        
+        .user-info {
+            margin-bottom: 20px;
+            font-size: 16px;
+            opacity: 0.8;
         }
     </style>
 </head>
 <body>
-    <h1 style="color: white;">🎡 Колесо Фортуны</h1>
-    
-    <div class="wheel-container">
-        <div class="pointer">▼</div>
-        <div class="wheel" id="wheel"></div>
+    <div class="container">
+        <h1>🎡 Колесо Фортуны</h1>
+        
+        <div class="user-info" id="userInfo">
+            Загрузка...
+        </div>
+        
+        <div class="wheel-container">
+            <div class="pointer">▼</div>
+            <div class="wheel" id="wheel"></div>
+        </div>
+        
+        <button class="spin-btn" id="spinBtn" onclick="spinWheel()">Крутить колесо!</button>
+        
+        <div class="result" id="result">
+            Нажмите "Крутить колесо!"
+        </div>
     </div>
-    
-    <button class="spin-btn" onclick="spinWheel()">Крутить колесо!</button>
-    <div class="result" id="result"></div>
 
     <script>
         const options = [
@@ -94,6 +152,25 @@
         ];
         
         let isSpinning = false;
+        let userName = "Участник";
+
+        // Инициализация Telegram Web App
+        function initTelegram() {
+            if (window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                
+                // Получаем информацию о пользователе
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                if (user) {
+                    userName = user.first_name || 'Участник';
+                    document.getElementById('userInfo').textContent = `Игрок: ${userName}`;
+                }
+                
+                return true;
+            }
+            return false;
+        }
 
         function spinWheel() {
             if (isSpinning) return;
@@ -101,15 +178,20 @@
             isSpinning = true;
             const wheel = document.getElementById('wheel');
             const resultElement = document.getElementById('result');
+            const spinBtn = document.getElementById('spinBtn');
+            
+            // Блокируем кнопку
+            spinBtn.disabled = true;
+            spinBtn.textContent = 'Колесо крутится...';
+            resultElement.textContent = "🎡 Колесо крутится...";
             
             // Случайное вращение (4+ оборота)
-            const extraSpins = 4 * 360; // 4 полных оборота
+            const extraSpins = 4 * 360;
             const randomDegree = Math.floor(Math.random() * 360);
             const totalRotation = extraSpins + randomDegree;
             
             // Запускаем анимацию
             wheel.style.transform = `rotate(${totalRotation}deg)`;
-            resultElement.textContent = "🎡 Колесо крутится...";
             
             // Определяем результат после анимации
             setTimeout(() => {
@@ -118,23 +200,63 @@
                 const result = options[winningIndex];
                 
                 resultElement.textContent = `🎉 ВЫПАЛО: ${result}!`;
-                isSpinning = false;
+                resultElement.style.background = "rgba(255,255,255,0.2)";
                 
-                // Отправляем результат в Telegram (работает только в Web App)
+                // Разблокируем кнопку
+                setTimeout(() => {
+                    isSpinning = false;
+                    spinBtn.disabled = false;
+                    spinBtn.textContent = 'Крутить колесо!';
+                }, 1000);
+                
+                // ОТПРАВЛЯЕМ РЕЗУЛЬТАТ В ЧАТ
                 if (window.Telegram && Telegram.WebApp) {
-                    Telegram.WebApp.sendData(JSON.stringify({
+                    const resultData = {
                         action: 'spin_result',
-                        result: result
-                    }));
+                        result: result,
+                        user: userName,
+                        index: winningIndex
+                    };
+                    
+                    Telegram.WebApp.sendData(JSON.stringify(resultData));
+                    
+                    // Закрываем Web App через 3 секунды
+                    setTimeout(() => {
+                        Telegram.WebApp.close();
+                    }, 3000);
                 }
             }, 3000);
         }
         
-        // Инициализация Telegram Web App
-        if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
+        // Добавляем метки на колесо
+        function addWheelLabels() {
+            const wheel = document.getElementById('wheel');
+            const segmentAngle = 360 / options.length;
+            
+            options.forEach((option, index) => {
+                const label = document.createElement('div');
+                label.className = 'segment-label';
+                label.textContent = option.split(' ')[1]; // Берем только эмодзи
+                
+                // Позиционируем метки по кругу
+                const angle = segmentAngle * index + segmentAngle/2;
+                const radius = 100; // расстояние от центра
+                
+                label.style.transform = `
+                    rotate(${angle}deg) 
+                    translate(${radius}px) 
+                    rotate(-${angle}deg)
+                `;
+                
+                wheel.appendChild(label);
+            });
         }
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            initTelegram();
+            addWheelLabels();
+        });
     </script>
 </body>
 </html>
