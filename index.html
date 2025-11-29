@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Колесо Фортуны</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .wheel-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 20px auto;
+        }
+        
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                #ff6b6b 0deg 60deg,
+                #4ecdc4 60deg 120deg,
+                #45b7d1 120deg 180deg,
+                #96ceb4 180deg 240deg,
+                #feca57 240deg 300deg,
+                #ff9ff3 300deg 360deg
+            );
+            transition: transform 3s cubic-bezier(0.2, 0.8, 0.3, 1);
+            border: 8px solid #fff;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 40px;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .spin-btn {
+            background: #fff;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        
+        .spin-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .result {
+            margin-top: 20px;
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: white;">🎡 Колесо Фортуны</h1>
+    
+    <div class="wheel-container">
+        <div class="pointer">▼</div>
+        <div class="wheel" id="wheel"></div>
+    </div>
+    
+    <button class="spin-btn" onclick="spinWheel()">Крутить колесо!</button>
+    <div class="result" id="result"></div>
+
+    <script>
+        const options = [
+            "Пицца 🍕", "Кино 🎬", "Прогулка 🚶", 
+            "Игры 🎮", "Кофе ☕", "Сон 😴"
+        ];
+        
+        let isSpinning = false;
+
+        function spinWheel() {
+            if (isSpinning) return;
+            
+            isSpinning = true;
+            const wheel = document.getElementById('wheel');
+            const resultElement = document.getElementById('result');
+            
+            // Случайное вращение (4+ оборота)
+            const extraSpins = 4 * 360; // 4 полных оборота
+            const randomDegree = Math.floor(Math.random() * 360);
+            const totalRotation = extraSpins + randomDegree;
+            
+            // Запускаем анимацию
+            wheel.style.transform = `rotate(${totalRotation}deg)`;
+            resultElement.textContent = "🎡 Колесо крутится...";
+            
+            // Определяем результат после анимации
+            setTimeout(() => {
+                const segment = 360 / options.length;
+                const winningIndex = Math.floor((360 - (randomDegree % 360)) / segment) % options.length;
+                const result = options[winningIndex];
+                
+                resultElement.textContent = `🎉 ВЫПАЛО: ${result}!`;
+                isSpinning = false;
+                
+                // Отправляем результат в Telegram (работает только в Web App)
+                if (window.Telegram && Telegram.WebApp) {
+                    Telegram.WebApp.sendData(JSON.stringify({
+                        action: 'spin_result',
+                        result: result
+                    }));
+                }
+            }, 3000);
+        }
+        
+        // Инициализация Telegram Web App
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+    </script>
+</body>
+</html>
