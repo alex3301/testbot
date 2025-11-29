@@ -13,6 +13,7 @@
             --dark-color: #333;
             --success-color: #28a745;
             --danger-color: #dc3545;
+            --warning-color: #ffc107;
         }
         
         * {
@@ -132,6 +133,15 @@
             background-color: #3a9c96;
         }
         
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: var(--dark-color);
+        }
+        
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        
         .card-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -196,6 +206,14 @@
             background-color: #cccccc;
         }
         
+        .user-vote.voted {
+            background-color: var(--success-color);
+        }
+        
+        .user-vote.pending {
+            background-color: var(--warning-color);
+        }
+        
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -251,11 +269,44 @@
             color: #17a2b8;
         }
         
+        .status-warning {
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #856404;
+        }
+        
         .controls {
             display: flex;
             gap: 10px;
             justify-content: center;
             margin-top: 20px;
+        }
+        
+        .session-url {
+            background-color: var(--light-color);
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+            font-family: monospace;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .facilitator-badge {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .participant-badge {
+            background-color: var(--accent-color);
+            color: white;
         }
         
         @media (min-width: 768px) {
@@ -277,7 +328,7 @@
     <div class="container">
         <header>
             <h1>Planning Poker</h1>
-            <p class="app-description">Инструмент для оценки сложности задач в Agile-командах. Работает полностью автономно в браузере.</p>
+            <p class="app-description">Инструмент для оценки сложности задач в Agile-командах с разделением ролей на ведущего и участников.</p>
         </header>
         
         <div class="main-content">
@@ -288,56 +339,98 @@
                     <input type="text" id="userName" placeholder="Введите ваше имя">
                 </div>
                 <div class="form-group">
-                    <label for="sessionName">Название сессии:</label>
-                    <input type="text" id="sessionName" placeholder="Название проекта или задачи">
-                </div>
-                <div class="form-group">
-                    <label for="cardSet">Набор карт:</label>
-                    <select id="cardSet">
-                        <option value="fibonacci">Фибоначчи (0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89)</option>
-                        <option value="tshirt">Размеры футболок (XS, S, M, L, XL)</option>
-                        <option value="powers">Степени двойки (0, 1, 2, 4, 8, 16, 32)</option>
+                    <label for="userRole">Ваша роль:</label>
+                    <select id="userRole">
+                        <option value="participant">Участник (может голосовать)</option>
+                        <option value="facilitator">Ведущий (не голосует, управляет сессией)</option>
                     </select>
                 </div>
-                <button id="joinSession" class="btn-success">Присоединиться к сессии</button>
+                
+                <div id="facilitatorSection">
+                    <div class="form-group">
+                        <label for="sessionName">Название сессии:</label>
+                        <input type="text" id="sessionName" placeholder="Название проекта или задачи">
+                    </div>
+                    <button id="createSession" class="btn-success">Создать сессию</button>
+                </div>
+                
+                <div id="participantSection" class="hidden">
+                    <div class="form-group">
+                        <label for="sessionUrl">URL сессии:</label>
+                        <input type="text" id="sessionUrl" placeholder="Введите URL сессии">
+                    </div>
+                    <button id="joinSession" class="btn-accent">Присоединиться к сессии</button>
+                </div>
                 
                 <div id="sessionInfo" class="hidden">
                     <div class="status-message status-info">
-                        Вы присоединились к сессии: <strong id="currentSessionName"></strong>
+                        <span id="sessionRoleInfo"></span>
+                        <span id="currentSessionName"></span>
                     </div>
-                    <div class="form-group">
-                        <label for="taskName">Название задачи для оценки:</label>
-                        <input type="text" id="taskName" placeholder="Опишите задачу">
+                    
+                    <div id="facilitatorControls" class="hidden">
+                        <div class="form-group">
+                            <label for="taskName">Название задачи для оценки:</label>
+                            <input type="text" id="taskName" placeholder="Опишите задачу">
+                        </div>
+                        <button id="startVoting" class="btn-accent">Начать голосование</button>
+                        
+                        <h3>Ссылка для участников:</h3>
+                        <div class="session-url" id="sessionUrlDisplay"></div>
+                        
+                        <h3>Присоединившиеся участники:</h3>
+                        <div class="user-list" id="facilitatorUserList">
+                            <!-- Список участников для ведущего -->
+                        </div>
                     </div>
-                    <button id="startVoting" class="btn-accent">Начать голосование</button>
+                    
+                    <div id="participantControls" class="hidden">
+                        <div id="waitingForStart" class="status-message status-info">
+                            Ожидание начала голосования...
+                        </div>
+                        
+                        <div id="votingParticipant" class="hidden">
+                            <h3 id="currentTaskName">Задача: </h3>
+                            <p>Выберите карту, которая отражает вашу оценку сложности задачи:</p>
+                            
+                            <div class="card-grid" id="cardOptions">
+                                <!-- Карты будут добавлены динамически -->
+                            </div>
+                            
+                            <div class="status-message status-info" id="voteStatus">
+                                Ваш голос еще не засчитан
+                            </div>
+                            
+                            <button id="submitVote" class="btn-success" disabled>Подтвердить голос</button>
+                        </div>
+                        
+                        <h3>Участники:</h3>
+                        <div class="user-list" id="participantUserList">
+                            <!-- Список участников для голосующего -->
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <div class="card voting-area">
                 <h2>Область голосования</h2>
-                <div id="votingSetup" class="hidden">
-                    <h3 id="currentTaskName">Задача: </h3>
-                    <p>Выберите карту, которая отражает вашу оценку сложности задачи:</p>
+                <div id="facilitatorVoting" class="hidden">
+                    <h3 id="facilitatorTaskName">Задача: </h3>
                     
-                    <div class="card-grid" id="cardOptions">
-                        <!-- Карты будут добавлены динамически -->
+                    <div class="status-message status-warning" id="facilitatorVoteStatus">
+                        Ожидание голосования участников...
                     </div>
                     
-                    <div class="status-message status-info" id="voteStatus">
-                        Ваш голос еще не засчитан
-                    </div>
-                    
-                    <button id="submitVote" class="btn-success" disabled>Подтвердить голос</button>
-                    <button id="revealVotes" class="btn-accent hidden">Показать результаты</button>
+                    <button id="revealVotes" class="btn-warning" disabled>Показать результаты</button>
                     
                     <h3>Участники:</h3>
-                    <div class="user-list" id="userList">
-                        <!-- Список пользователей будет добавлен динамически -->
+                    <div class="user-list" id="facilitatorVotingUserList">
+                        <!-- Список участников для ведущего во время голосования -->
                     </div>
                 </div>
                 
-                <div id="waitingForStart" class="status-message status-info">
-                    Ожидание начала голосования...
+                <div id="waitingArea" class="status-message status-info">
+                    Настройте сессию для начала работы
                 </div>
             </div>
         </div>
@@ -352,7 +445,7 @@
             </div>
             <div class="controls">
                 <button id="newVoting" class="btn-accent">Новое голосование</button>
-                <button id="resetSession" class="btn-danger">Сбросить сессию</button>
+                <button id="resetSession" class="btn-danger">Завершить сессию</button>
             </div>
         </div>
     </div>
@@ -361,8 +454,9 @@
         // Данные приложения
         const appState = {
             currentUser: null,
+            userRole: null,
+            sessionId: null,
             sessionName: null,
-            cardSet: 'fibonacci',
             currentTask: null,
             users: [],
             votes: {},
@@ -370,31 +464,41 @@
             resultsRevealed: false
         };
 
-        // Наборы карт
-        const cardSets = {
-            fibonacci: ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?', '☕'],
-            tshirt: ['XS', 'S', 'M', 'L', 'XL', '?', '☕'],
-            powers: ['0', '1', '2', '4', '8', '16', '32', '?', '☕']
-        };
+        // Набор карт (только 2, 6, 9)
+        const cardSet = ['2', '6', '9'];
 
         // Элементы DOM
         const elements = {
             userName: document.getElementById('userName'),
+            userRole: document.getElementById('userRole'),
+            facilitatorSection: document.getElementById('facilitatorSection'),
+            participantSection: document.getElementById('participantSection'),
             sessionName: document.getElementById('sessionName'),
-            cardSet: document.getElementById('cardSet'),
+            createSession: document.getElementById('createSession'),
+            sessionUrl: document.getElementById('sessionUrl'),
             joinSession: document.getElementById('joinSession'),
             sessionInfo: document.getElementById('sessionInfo'),
+            sessionRoleInfo: document.getElementById('sessionRoleInfo'),
             currentSessionName: document.getElementById('currentSessionName'),
+            facilitatorControls: document.getElementById('facilitatorControls'),
+            participantControls: document.getElementById('participantControls'),
             taskName: document.getElementById('taskName'),
             startVoting: document.getElementById('startVoting'),
-            votingSetup: document.getElementById('votingSetup'),
+            sessionUrlDisplay: document.getElementById('sessionUrlDisplay'),
+            facilitatorUserList: document.getElementById('facilitatorUserList'),
+            waitingForStart: document.getElementById('waitingForStart'),
+            votingParticipant: document.getElementById('votingParticipant'),
             currentTaskName: document.getElementById('currentTaskName'),
             cardOptions: document.getElementById('cardOptions'),
             voteStatus: document.getElementById('voteStatus'),
             submitVote: document.getElementById('submitVote'),
+            participantUserList: document.getElementById('participantUserList'),
+            facilitatorVoting: document.getElementById('facilitatorVoting'),
+            facilitatorTaskName: document.getElementById('facilitatorTaskName'),
+            facilitatorVoteStatus: document.getElementById('facilitatorVoteStatus'),
             revealVotes: document.getElementById('revealVotes'),
-            userList: document.getElementById('userList'),
-            waitingForStart: document.getElementById('waitingForStart'),
+            facilitatorVotingUserList: document.getElementById('facilitatorVotingUserList'),
+            waitingArea: document.getElementById('waitingArea'),
             resultsSection: document.getElementById('resultsSection'),
             resultsGrid: document.getElementById('resultsGrid'),
             averageResult: document.getElementById('averageResult'),
@@ -404,43 +508,52 @@
 
         // Инициализация приложения
         function initApp() {
-            // Восстановление состояния из localStorage
-            const savedState = localStorage.getItem('planningPokerState');
-            if (savedState) {
-                const parsedState = JSON.parse(savedState);
-                Object.assign(appState, parsedState);
-                
-                // Восстановление UI
-                if (appState.currentUser) {
-                    elements.userName.value = appState.currentUser;
-                }
-                if (appState.sessionName) {
-                    elements.sessionName.value = appState.sessionName;
-                    elements.currentSessionName.textContent = appState.sessionName;
-                    elements.sessionInfo.classList.remove('hidden');
-                }
-                elements.cardSet.value = appState.cardSet;
-                
-                if (appState.votingActive) {
-                    startVotingUI(appState.currentTask);
-                } else if (appState.resultsRevealed) {
-                    showResults();
-                }
-                
-                updateUserList();
-            }
+            // Обработчик изменения роли
+            elements.userRole.addEventListener('change', toggleRoleSections);
             
             // Назначение обработчиков событий
+            elements.createSession.addEventListener('click', createSession);
             elements.joinSession.addEventListener('click', joinSession);
             elements.startVoting.addEventListener('click', startVoting);
             elements.submitVote.addEventListener('click', submitVote);
             elements.revealVotes.addEventListener('click', revealVotes);
             elements.newVoting.addEventListener('click', newVoting);
             elements.resetSession.addEventListener('click', resetSession);
+            
+            // Проверка параметров URL для автоматического присоединения
+            checkUrlParams();
+            
+            // Инициализация интервала для обновления состояния
+            setInterval(updateSessionState, 2000);
         }
 
-        // Присоединение к сессии
-        function joinSession() {
+        // Переключение секций в зависимости от роли
+        function toggleRoleSections() {
+            const role = elements.userRole.value;
+            
+            if (role === 'facilitator') {
+                elements.facilitatorSection.classList.remove('hidden');
+                elements.participantSection.classList.add('hidden');
+            } else {
+                elements.facilitatorSection.classList.add('hidden');
+                elements.participantSection.classList.remove('hidden');
+            }
+        }
+
+        // Проверка параметров URL для автоматического присоединения
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionId = urlParams.get('session');
+            
+            if (sessionId) {
+                elements.sessionUrl.value = window.location.href.split('?')[0] + '?session=' + sessionId;
+                elements.userRole.value = 'participant';
+                toggleRoleSections();
+            }
+        }
+
+        // Создание сессии
+        function createSession() {
             const userName = elements.userName.value.trim();
             const sessionName = elements.sessionName.value.trim();
             
@@ -454,20 +567,93 @@
                 return;
             }
             
-            appState.currentUser = userName;
-            appState.sessionName = sessionName;
-            appState.cardSet = elements.cardSet.value;
+            // Генерация ID сессии
+            const sessionId = generateSessionId();
             
-            // Добавление пользователя в список
-            if (!appState.users.includes(userName)) {
-                appState.users.push(userName);
-            }
+            appState.currentUser = userName;
+            appState.userRole = 'facilitator';
+            appState.sessionId = sessionId;
+            appState.sessionName = sessionName;
+            appState.users = [{name: userName, role: 'facilitator', voted: false}];
             
             // Обновление UI
+            elements.sessionRoleInfo.innerHTML = `Вы - <span class="role-badge facilitator-badge">Ведущий</span>. Сессия: `;
             elements.currentSessionName.textContent = sessionName;
             elements.sessionInfo.classList.remove('hidden');
-            elements.votingSetup.classList.add('hidden');
-            elements.waitingForStart.classList.remove('hidden');
+            elements.facilitatorControls.classList.remove('hidden');
+            elements.participantControls.classList.add('hidden');
+            elements.waitingArea.classList.add('hidden');
+            
+            // Показать URL для присоединения
+            const sessionUrl = window.location.href.split('?')[0] + '?session=' + sessionId;
+            elements.sessionUrlDisplay.textContent = sessionUrl;
+            
+            updateUserList();
+            saveState();
+        }
+
+        // Присоединение к сессии
+        function joinSession() {
+            const userName = elements.userName.value.trim();
+            const sessionUrl = elements.sessionUrl.value.trim();
+            
+            if (!userName) {
+                alert('Пожалуйста, введите ваше имя');
+                return;
+            }
+            
+            if (!sessionUrl) {
+                alert('Пожалуйста, введите URL сессии');
+                return;
+            }
+            
+            // Извлечение ID сессии из URL
+            const urlParams = new URLSearchParams(new URL(sessionUrl).search);
+            const sessionId = urlParams.get('session');
+            
+            if (!sessionId) {
+                alert('Неверный URL сессии');
+                return;
+            }
+            
+            // Загрузка состояния сессии
+            const savedState = localStorage.getItem('planningPoker_' + sessionId);
+            if (!savedState) {
+                alert('Сессия не найдена или была завершена');
+                return;
+            }
+            
+            const sessionState = JSON.parse(savedState);
+            
+            // Проверка, не присоединен ли уже пользователь с таким именем
+            if (sessionState.users.some(user => user.name === userName)) {
+                alert('Пользователь с таким именем уже присоединился к сессии');
+                return;
+            }
+            
+            appState.currentUser = userName;
+            appState.userRole = 'participant';
+            appState.sessionId = sessionId;
+            appState.sessionName = sessionState.sessionName;
+            appState.users = sessionState.users;
+            appState.currentTask = sessionState.currentTask;
+            appState.votingActive = sessionState.votingActive;
+            appState.votes = sessionState.votes;
+            
+            // Добавление пользователя в список
+            appState.users.push({name: userName, role: 'participant', voted: false});
+            
+            // Обновление UI
+            elements.sessionRoleInfo.innerHTML = `Вы - <span class="role-badge participant-badge">Участник</span>. Сессия: `;
+            elements.currentSessionName.textContent = sessionState.sessionName;
+            elements.sessionInfo.classList.remove('hidden');
+            elements.facilitatorControls.classList.add('hidden');
+            elements.participantControls.classList.remove('hidden');
+            elements.waitingArea.classList.add('hidden');
+            
+            if (appState.votingActive) {
+                startVotingForParticipant();
+            }
             
             updateUserList();
             saveState();
@@ -487,16 +673,27 @@
             appState.votes = {};
             appState.resultsRevealed = false;
             
-            startVotingUI(taskName);
+            // Сброс статуса голосования для всех участников
+            appState.users.forEach(user => {
+                if (user.role === 'participant') {
+                    user.voted = false;
+                }
+            });
+            
+            // Обновление UI для ведущего
+            elements.facilitatorVoting.classList.remove('hidden');
+            elements.facilitatorTaskName.textContent = `Задача: ${taskName}`;
+            elements.revealVotes.disabled = true;
+            
+            updateUserList();
             saveState();
         }
 
-        // Обновление UI для начала голосования
-        function startVotingUI(taskName) {
-            elements.currentTaskName.textContent = `Задача: ${taskName}`;
-            elements.votingSetup.classList.remove('hidden');
+        // Начало голосования для участника
+        function startVotingForParticipant() {
             elements.waitingForStart.classList.add('hidden');
-            elements.resultsSection.classList.add('hidden');
+            elements.votingParticipant.classList.remove('hidden');
+            elements.currentTaskName.textContent = `Задача: ${appState.currentTask}`;
             
             // Создание карт для голосования
             createCardOptions();
@@ -505,17 +702,13 @@
             elements.voteStatus.textContent = 'Ваш голос еще не засчитан';
             elements.voteStatus.className = 'status-message status-info';
             elements.submitVote.disabled = true;
-            elements.revealVotes.classList.add('hidden');
-            
-            updateUserList();
         }
 
         // Создание карт для голосования
         function createCardOptions() {
             elements.cardOptions.innerHTML = '';
-            const cards = cardSets[appState.cardSet];
             
-            cards.forEach(card => {
+            cardSet.forEach(card => {
                 const cardElement = document.createElement('div');
                 cardElement.className = 'card-value';
                 cardElement.textContent = card;
@@ -541,18 +734,17 @@
         function submitVote() {
             if (!appState.selectedCard) return;
             
+            // Обновление состояния
             appState.votes[appState.currentUser] = appState.selectedCard;
+            const userIndex = appState.users.findIndex(user => user.name === appState.currentUser);
+            if (userIndex !== -1) {
+                appState.users[userIndex].voted = true;
+            }
             
             // Обновление UI
             elements.voteStatus.textContent = `Вы проголосовали: ${appState.selectedCard}`;
             elements.voteStatus.className = 'status-message status-success';
             elements.submitVote.disabled = true;
-            
-            // Проверка, все ли проголосовали
-            const allVoted = appState.users.every(user => appState.votes[user]);
-            if (allVoted) {
-                elements.revealVotes.classList.remove('hidden');
-            }
             
             updateUserList();
             saveState();
@@ -569,7 +761,8 @@
 
         // Показать результаты голосования
         function showResults() {
-            elements.votingSetup.classList.add('hidden');
+            elements.facilitatorVoting.classList.add('hidden');
+            elements.votingParticipant.classList.add('hidden');
             elements.resultsSection.classList.remove('hidden');
             
             // Подсчет результатов
@@ -593,10 +786,7 @@
             Object.keys(voteCounts).sort((a, b) => {
                 const numA = parseFloat(a);
                 const numB = parseFloat(b);
-                if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-                if (!isNaN(numA)) return -1;
-                if (!isNaN(numB)) return 1;
-                return a.localeCompare(b);
+                return numA - numB;
             }).forEach(value => {
                 const count = voteCounts[value];
                 const resultCard = document.createElement('div');
@@ -620,78 +810,158 @@
                 const average = numericSum / numericCount;
                 elements.averageResult.textContent = `Среднее значение: ${average.toFixed(2)}`;
             } else {
-                elements.averageResult.textContent = 'Среднее значение: не вычислено (нечисловые оценки)';
+                elements.averageResult.textContent = 'Среднее значение: не вычислено';
             }
         }
 
         // Новое голосование
         function newVoting() {
-            elements.taskName.value = '';
+            appState.votingActive = false;
+            appState.resultsRevealed = false;
+            appState.votes = {};
+            
+            // Сброс статуса голосования для всех участников
+            appState.users.forEach(user => {
+                user.voted = false;
+            });
+            
             elements.resultsSection.classList.add('hidden');
-            elements.sessionInfo.classList.remove('hidden');
+            
+            if (appState.userRole === 'facilitator') {
+                elements.facilitatorVoting.classList.add('hidden');
+            } else {
+                elements.waitingForStart.classList.remove('hidden');
+                elements.votingParticipant.classList.add('hidden');
+            }
+            
+            updateUserList();
+            saveState();
         }
 
-        // Сброс сессии
+        // Завершение сессии
         function resetSession() {
-            if (confirm('Вы уверены, что хотите сбросить сессию? Все данные будут удалены.')) {
-                // Сброс состояния приложения
-                appState.currentUser = null;
-                appState.sessionName = null;
-                appState.currentTask = null;
-                appState.users = [];
-                appState.votes = {};
-                appState.votingActive = false;
-                appState.resultsRevealed = false;
+            if (confirm('Вы уверены, что хотите завершить сессию? Все данные будут удалены.')) {
+                // Удаление состояния сессии из localStorage
+                if (appState.sessionId) {
+                    localStorage.removeItem('planningPoker_' + appState.sessionId);
+                }
                 
-                // Сброс UI
-                elements.userName.value = '';
-                elements.sessionName.value = '';
-                elements.taskName.value = '';
-                elements.sessionInfo.classList.add('hidden');
-                elements.votingSetup.classList.add('hidden');
-                elements.waitingForStart.classList.remove('hidden');
-                elements.resultsSection.classList.add('hidden');
-                elements.userList.innerHTML = '';
-                
-                // Очистка localStorage
-                localStorage.removeItem('planningPokerState');
+                // Перезагрузка страницы
+                window.location.href = window.location.href.split('?')[0];
             }
         }
 
         // Обновление списка пользователей
         function updateUserList() {
-            elements.userList.innerHTML = '';
+            // Для ведущего в настройках
+            elements.facilitatorUserList.innerHTML = '';
+            
+            // Для участника
+            elements.participantUserList.innerHTML = '';
+            
+            // Для ведущего во время голосования
+            elements.facilitatorVotingUserList.innerHTML = '';
             
             appState.users.forEach(user => {
                 const userCard = document.createElement('div');
                 userCard.className = 'user-card';
                 
                 const userName = document.createElement('span');
-                userName.textContent = user;
+                userName.textContent = user.name;
+                
+                const userBadge = document.createElement('span');
+                userBadge.className = `role-badge ${user.role === 'facilitator' ? 'facilitator-badge' : 'participant-badge'}`;
+                userBadge.textContent = user.role === 'facilitator' ? 'В' : 'У';
                 
                 const userVote = document.createElement('div');
                 userVote.className = 'user-vote';
                 
-                if (appState.votes[user] && appState.resultsRevealed) {
-                    userVote.textContent = appState.votes[user];
+                if (user.role === 'facilitator') {
+                    userVote.textContent = '—';
+                    userVote.classList.add('hidden');
+                } else if (user.voted && appState.resultsRevealed) {
+                    userVote.textContent = appState.votes[user.name] || '?';
                     userVote.classList.remove('hidden');
-                } else if (appState.votes[user] && !appState.resultsRevealed) {
+                } else if (user.voted) {
                     userVote.textContent = '✓';
-                    userVote.classList.remove('hidden');
+                    userVote.classList.add('voted');
                 } else {
                     userVote.textContent = '?';
-                    userVote.classList.add('hidden');
+                    userVote.classList.add('pending');
                 }
                 
                 userCard.appendChild(userName);
+                userCard.appendChild(userBadge);
                 userCard.appendChild(userVote);
-                elements.userList.appendChild(userCard);
+                
+                // Добавление в соответствующие списки
+                elements.facilitatorUserList.appendChild(userCard.cloneNode(true));
+                elements.participantUserList.appendChild(userCard.cloneNode(true));
+                elements.facilitatorVotingUserList.appendChild(userCard.cloneNode(true));
             });
+            
+            // Обновление состояния кнопки "Показать результаты" для ведущего
+            if (appState.userRole === 'facilitator' && appState.votingActive) {
+                const allVoted = appState.users.filter(user => user.role === 'participant')
+                    .every(user => user.voted);
+                elements.revealVotes.disabled = !allVoted;
+                
+                if (allVoted) {
+                    elements.facilitatorVoteStatus.textContent = 'Все участники проголосовали!';
+                    elements.facilitatorVoteStatus.className = 'status-message status-success';
+                } else {
+                    const votedCount = appState.users.filter(user => user.role === 'participant' && user.voted).length;
+                    const totalCount = appState.users.filter(user => user.role === 'participant').length;
+                    elements.facilitatorVoteStatus.textContent = `Проголосовало: ${votedCount} из ${totalCount}`;
+                    elements.facilitatorVoteStatus.className = 'status-message status-warning';
+                }
+            }
+        }
+
+        // Обновление состояния сессии
+        function updateSessionState() {
+            if (appState.sessionId) {
+                const savedState = localStorage.getItem('planningPoker_' + appState.sessionId);
+                if (savedState) {
+                    const sessionState = JSON.parse(savedState);
+                    
+                    // Обновление состояния, если пользователь участник
+                    if (appState.userRole === 'participant') {
+                        // Обновление списка пользователей
+                        appState.users = sessionState.users;
+                        
+                        // Обновление состояния голосования
+                        if (sessionState.votingActive && !appState.votingActive) {
+                            appState.votingActive = true;
+                            appState.currentTask = sessionState.currentTask;
+                            startVotingForParticipant();
+                        } else if (!sessionState.votingActive && appState.votingActive) {
+                            appState.votingActive = false;
+                        }
+                        
+                        // Обновление результатов
+                        if (sessionState.resultsRevealed && !appState.resultsRevealed) {
+                            appState.resultsRevealed = true;
+                            appState.votes = sessionState.votes;
+                            showResults();
+                        }
+                        
+                        updateUserList();
+                    }
+                }
+            }
         }
 
         // Сохранение состояния в localStorage
         function saveState() {
-            localStorage.setItem('planningPokerState', JSON.stringify(appState));
+            if (appState.sessionId) {
+                localStorage.setItem('planningPoker_' + appState.sessionId, JSON.stringify(appState));
+            }
+        }
+
+        // Генерация ID сессии
+        function generateSessionId() {
+            return Math.random().toString(36).substring(2, 10);
         }
 
         // Инициализация приложения при загрузке
