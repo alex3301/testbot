@@ -290,6 +290,13 @@
             font-family: monospace;
         }
         
+        .copy-btn {
+            background-color: var(--accent-color);
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            margin-left: 10px;
+        }
+        
         .role-badge {
             display: inline-block;
             padding: 3px 8px;
@@ -307,6 +314,15 @@
         .participant-badge {
             background-color: var(--accent-color);
             color: white;
+        }
+        
+        .instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.9rem;
         }
         
         @media (min-width: 768px) {
@@ -355,9 +371,15 @@
                 </div>
                 
                 <div id="participantSection" class="hidden">
+                    <div class="instructions">
+                        <strong>Как присоединиться:</strong><br>
+                        1. Попросите ведущего создать сессию и поделиться ссылкой<br>
+                        2. Вставьте полученную ссылку в поле ниже<br>
+                        3. Нажмите "Присоединиться к сессии"
+                    </div>
                     <div class="form-group">
-                        <label for="sessionUrl">URL сессии:</label>
-                        <input type="text" id="sessionUrl" placeholder="Введите URL сессии">
+                        <label for="sessionUrl">Ссылка на сессию:</label>
+                        <input type="text" id="sessionUrl" placeholder="Вставьте ссылку от ведущего">
                     </div>
                     <button id="joinSession" class="btn-accent">Присоединиться к сессии</button>
                 </div>
@@ -377,6 +399,7 @@
                         
                         <h3>Ссылка для участников:</h3>
                         <div class="session-url" id="sessionUrlDisplay"></div>
+                        <button id="copyUrl" class="copy-btn">Копировать ссылку</button>
                         
                         <h3>Присоединившиеся участники:</h3>
                         <div class="user-list" id="facilitatorUserList">
@@ -485,6 +508,7 @@
             taskName: document.getElementById('taskName'),
             startVoting: document.getElementById('startVoting'),
             sessionUrlDisplay: document.getElementById('sessionUrlDisplay'),
+            copyUrl: document.getElementById('copyUrl'),
             facilitatorUserList: document.getElementById('facilitatorUserList'),
             waitingForStart: document.getElementById('waitingForStart'),
             votingParticipant: document.getElementById('votingParticipant'),
@@ -514,6 +538,7 @@
             // Назначение обработчиков событий
             elements.createSession.addEventListener('click', createSession);
             elements.joinSession.addEventListener('click', joinSession);
+            elements.copyUrl.addEventListener('click', copySessionUrl);
             elements.startVoting.addEventListener('click', startVoting);
             elements.submitVote.addEventListener('click', submitVote);
             elements.revealVotes.addEventListener('click', revealVotes);
@@ -546,9 +571,13 @@
             const sessionId = urlParams.get('session');
             
             if (sessionId) {
-                elements.sessionUrl.value = window.location.href.split('?')[0] + '?session=' + sessionId;
+                // Автоматически заполняем поле URL для участника
+                elements.sessionUrl.value = window.location.href;
                 elements.userRole.value = 'participant';
                 toggleRoleSections();
+                
+                // Показываем подсказку, что можно присоединиться
+                alert('Обнаружена сессия! Заполните имя и нажмите "Присоединиться к сессии"');
             }
         }
 
@@ -585,7 +614,7 @@
             elements.waitingArea.classList.add('hidden');
             
             // Показать URL для присоединения
-            const sessionUrl = window.location.href.split('?')[0] + '?session=' + sessionId;
+            const sessionUrl = generateSessionUrl(sessionId);
             elements.sessionUrlDisplay.textContent = sessionUrl;
             
             updateUserList();
@@ -608,18 +637,25 @@
             }
             
             // Извлечение ID сессии из URL
-            const urlParams = new URLSearchParams(new URL(sessionUrl).search);
-            const sessionId = urlParams.get('session');
+            let sessionId;
+            try {
+                const urlObj = new URL(sessionUrl);
+                sessionId = urlObj.searchParams.get('session');
+            } catch (e) {
+                // Если не удалось разобрать как URL, попробуем извлечь ID другим способом
+                const match = sessionUrl.match(/session=([^&]+)/);
+                sessionId = match ? match[1] : null;
+            }
             
             if (!sessionId) {
-                alert('Неверный URL сессии');
+                alert('Неверный URL сессии. Убедитесь, что вы вставили полную ссылку, которую вам отправил ведущий.');
                 return;
             }
             
             // Загрузка состояния сессии
             const savedState = localStorage.getItem('planningPoker_' + sessionId);
             if (!savedState) {
-                alert('Сессия не найдена или была завершена');
+                alert('Сессия не найдена или была завершена. Попросите ведущего создать новую сессию.');
                 return;
             }
             
@@ -627,7 +663,7 @@
             
             // Проверка, не присоединен ли уже пользователь с таким именем
             if (sessionState.users.some(user => user.name === userName)) {
-                alert('Пользователь с таким именем уже присоединился к сессии');
+                alert('Пользователь с таким именем уже присоединился к сессии. Пожалуйста, используйте другое имя.');
                 return;
             }
             
@@ -657,6 +693,32 @@
             
             updateUserList();
             saveState();
+            
+            // Показать сообщение об успешном присоединении
+            alert(`Вы успешно присоединились к сессии "${sessionState.sessionName}"`);
+        }
+
+        // Копирование URL сессии в буфер обмена
+        function copySessionUrl() {
+            const url = elements.sessionUrlDisplay.textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Ссылка скопирована в буфер обмена!');
+            }).catch(err => {
+                console.error('Ошибка копирования: ', err);
+                // Fallback для старых браузеров
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Ссылка скопирована в буфер обмена!');
+            });
+        }
+
+        // Генерация URL сессии
+        function generateSessionUrl(sessionId) {
+            return window.location.href.split('?')[0] + '?session=' + sessionId;
         }
 
         // Начало голосования
