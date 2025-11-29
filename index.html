@@ -123,6 +123,12 @@
             font-size: 16px;
             opacity: 0.8;
         }
+        
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -143,6 +149,8 @@
         <div class="result" id="result">
             Нажмите "Крутить колесо!"
         </div>
+        
+        <div class="status" id="status"></div>
     </div>
 
     <script>
@@ -153,23 +161,28 @@
         
         let isSpinning = false;
         let userName = "Участник";
+        let tgWebApp = null;
 
         // Инициализация Telegram Web App
         function initTelegram() {
             if (window.Telegram && Telegram.WebApp) {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
+                tgWebApp = Telegram.WebApp;
+                tgWebApp.ready();
+                tgWebApp.expand();
                 
                 // Получаем информацию о пользователе
-                const user = Telegram.WebApp.initDataUnsafe.user;
+                const user = tgWebApp.initDataUnsafe.user;
                 if (user) {
                     userName = user.first_name || 'Участник';
                     document.getElementById('userInfo').textContent = `Игрок: ${userName}`;
                 }
                 
+                document.getElementById('status').textContent = "Telegram Web App инициализирован";
                 return true;
+            } else {
+                document.getElementById('status').textContent = "Telegram Web App не доступен";
+                return false;
             }
-            return false;
         }
 
         function spinWheel() {
@@ -179,11 +192,13 @@
             const wheel = document.getElementById('wheel');
             const resultElement = document.getElementById('result');
             const spinBtn = document.getElementById('spinBtn');
+            const statusElement = document.getElementById('status');
             
             // Блокируем кнопку
             spinBtn.disabled = true;
             spinBtn.textContent = 'Колесо крутится...';
             resultElement.textContent = "🎡 Колесо крутится...";
+            statusElement.textContent = "Анимация запущена...";
             
             // Случайное вращение (4+ оборота)
             const extraSpins = 4 * 360;
@@ -202,6 +217,33 @@
                 resultElement.textContent = `🎉 ВЫПАЛО: ${result}!`;
                 resultElement.style.background = "rgba(255,255,255,0.2)";
                 
+                // ОТПРАВЛЯЕМ РЕЗУЛЬТАТ В ЧАТ
+                if (tgWebApp) {
+                    const resultData = {
+                        action: 'spin_result',
+                        result: result,
+                        user: userName,
+                        index: winningIndex,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    statusElement.textContent = "Отправка результата в чат...";
+                    
+                    try {
+                        tgWebApp.sendData(JSON.stringify(resultData));
+                        statusElement.textContent = "✅ Результат отправлен! Закрытие через 3 секунды...";
+                        
+                        // Закрываем Web App через 3 секунды
+                        setTimeout(() => {
+                            tgWebApp.close();
+                        }, 3000);
+                    } catch (error) {
+                        statusElement.textContent = "❌ Ошибка отправки: " + error;
+                    }
+                } else {
+                    statusElement.textContent = "❌ Telegram Web App не доступен для отправки";
+                }
+                
                 // Разблокируем кнопку
                 setTimeout(() => {
                     isSpinning = false;
@@ -209,22 +251,6 @@
                     spinBtn.textContent = 'Крутить колесо!';
                 }, 1000);
                 
-                // ОТПРАВЛЯЕМ РЕЗУЛЬТАТ В ЧАТ
-                if (window.Telegram && Telegram.WebApp) {
-                    const resultData = {
-                        action: 'spin_result',
-                        result: result,
-                        user: userName,
-                        index: winningIndex
-                    };
-                    
-                    Telegram.WebApp.sendData(JSON.stringify(resultData));
-                    
-                    // Закрываем Web App через 3 секунды
-                    setTimeout(() => {
-                        Telegram.WebApp.close();
-                    }, 3000);
-                }
             }, 3000);
         }
         
@@ -240,7 +266,7 @@
                 
                 // Позиционируем метки по кругу
                 const angle = segmentAngle * index + segmentAngle/2;
-                const radius = 100; // расстояние от центра
+                const radius = 100;
                 
                 label.style.transform = `
                     rotate(${angle}deg) 
